@@ -1,116 +1,209 @@
 package com.example.instagramclone
 
-import android.content.ContentValues
+
+import android.content.Context
 import android.content.Intent
-import androidx.appcompat.app.AppCompatActivity
+import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Base64
 import android.util.Log
-import android.widget.Toast
-import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
 import com.example.instagramclone.databinding.ActivityLoginBinding
-import com.example.instagramclone.databinding.ActivityMainBinding
-import com.google.android.gms.auth.api.Auth
-import com.google.android.gms.auth.api.identity.BeginSignInRequest
+import com.facebook.AccessToken
+import com.facebook.CallbackManager
+import com.facebook.FacebookCallback
+import com.facebook.FacebookException
+import com.facebook.login.LoginManager
+import com.facebook.login.LoginResult
 import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
-import com.google.android.gms.tasks.Task
+import com.google.firebase.auth.FacebookAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
+import java.security.MessageDigest
+import java.security.NoSuchAlgorithmException
+import java.util.*
+import androidx.databinding.DataBindingUtil
+
 
 class LoginActivity : AppCompatActivity() {
-    lateinit var binding : ActivityLoginBinding
 
-    var auth : FirebaseAuth? = null
-    var googleSignClient : GoogleSignInClient? = null
-    var GOOGLE_LOGIN_CODE = 9001
+    lateinit var auth : FirebaseAuth
+    lateinit var binding : ActivityLoginBinding
+    lateinit var googleSigninClient  : GoogleSignInClient
+    var TAG = "LoginActivity"
+    lateinit var callbackManager: CallbackManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+       // binding = DataBindingUtil.setContentView(MainActivity.this, R.layout.activity_main)
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
         auth = FirebaseAuth.getInstance()
         binding.emailLoginButton.setOnClickListener {
             signinAndSignup()
         }
+       /* binding.findIdPasswordButton.setOnClickListener {
+            startActivity(Intent(this,FindIdActivity::class.java))
+        }*/
+        //GoogleLogin
         binding.googleSignInButton.setOnClickListener {
             googleLogin()
         }
+
         var gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken("491777352904-d2fob2ohg00vjshbb5h7iljrlf54ph9a.apps.googleusercontent.com")
+            .requestIdToken(getString(R.string.default_web_client_id))
             .requestEmail()
             .build()
-        googleSignClient = GoogleSignIn.getClient(this,gso)
+
+        googleSigninClient = GoogleSignIn.getClient(this,gso)
+
+        //Facebook
+        callbackManager = CallbackManager.Factory.create()
+        binding.facebookLoginButton.setOnClickListener {
+            facebookLogin()
+        }
+        moveMain(auth.currentUser)
+//        printHashKey(this)
     }
+
+    fun onSrart() {
+        super.onStart()
+        moveMain(auth?.currentUser)
+    }
+
     fun googleLogin(){
-        var signIntent = googleSignClient!!.signInIntent
-        startForResult.launch(signIntent)
+        var i = googleSigninClient.signInIntent
+        googleLoginResult.launch(i)
     }
 
+    fun facebookLogin(){
+        var loginManager = LoginManager.getInstance()
+        //로그인 요청
+        loginManager.logInWithReadPermissions(this, Arrays.asList("public_profile","email"))
+        loginManager.registerCallback(callbackManager,object : FacebookCallback<LoginResult> {
+            override fun onSuccess(result: LoginResult?) {
+                var token = result?.accessToken
+                firebaseAuthWithFacebook(token)
+            }
 
-    private val startForResult =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()){
-            result: ActivityResult ->
+            override fun onCancel() {
 
-            if(result.resultCode == RESULT_OK){
-                val intent: Intent = result.data!!
-                val task: Task<GoogleSignInAccount> =
-                    GoogleSignIn.getSignedInAccountFromIntent(intent)
-                try {
-                    val account = task.getResult(ApiException::class.java)!!
-                    Log.d(ContentValues.TAG,"firebaseAuthWithGoogle" + account.id)
-                    firebaseAuthWithGoogle(account)
-                }catch (e: ApiException){
-                    Log.w(ContentValues.TAG, "Google sign in failed",e)
+            }
+
+            override fun onError(error: FacebookException?) {
+
+            }
+
+        })
+    }
+
+    fun firebaseAuthWithFacebook(idToken: AccessToken?) {
+        var credential = FacebookAuthProvider.getCredential(idToken!!.token)
+        auth.signInWithCredential(credential).addOnCompleteListener {
+                task ->
+            if(task.isSuccessful){
+                if(auth.currentUser!!.isEmailVerified){
+                    //이메일 인증이 되었을때
+                    moveMain(auth.currentUser)
+                }else{
+                    //이메일 인증이 안됬을때
+                    saveFindIdData()
                 }
-            }
-        }
 
-    private fun firebaseAuthWithGoogle(account: GoogleSignInAccount?) {
-        val credential = GoogleAuthProvider.getCredential(account?.idToken, null)
-        auth?.signInWithCredential(credential)?.addOnCompleteListener { task ->
-            if (task.isSuccessful) {
-                moveMainPage(task.result?.user)
-            }else{
-                Toast.makeText(this,"Authentication failed", Toast.LENGTH_SHORT).show()
-            }
             }
         }
+    }
+
+    fun firebaseAuthWithGoogle(idToken: String?) {
+        var credential = GoogleAuthProvider.getCredential(idToken,null)
+        auth.signInWithCredential(credential).addOnCompleteListener {
+                task ->
+            if(task.isSuccessful){
+                if(auth.currentUser!!.isEmailVerified){
+                    //이메일 인증이 되었을때
+                    moveMain(auth.currentUser)
+                }else{
+                    //이메일 인증이 안됬을때
+                    saveFindIdData()
+                }
+
+            }
+        }
+    }
+
 
     fun signinAndSignup(){
-        auth?.createUserWithEmailAndPassword(binding.emailEdittext.text.toString().trim(), binding.passwordEdittext.text.toString().trim())?.addOnCompleteListener {
-            task ->
-                if(task.isSuccessful){
-                    Toast.makeText(this,"로그인성공",Toast.LENGTH_SHORT).show()
-                    //아이디 생성 성공
-                    moveMainPage(task.result?.user)
-                }else if(task.exception?.message.isNullOrEmpty()){
-                    //로그인 실패
-                    Toast.makeText(this,task.exception?.message, Toast.LENGTH_LONG).show()
-                }else{
-                    siginEmail()
-                }
-        }
-    }
-    fun siginEmail(){
-        auth?.signInWithEmailAndPassword(binding.emailEdittext.text.toString().trim(), binding.passwordEdittext.text.toString().trim())?.addOnCompleteListener {
+        var id = binding.emailEdittext.text.toString()
+        var password = binding.passwordEdittext.text.toString()
+        auth.createUserWithEmailAndPassword(id,password).addOnCompleteListener {
                 task ->
-                     if (task.isSuccessful) {
-                //로그인 성공
-
+            if(task.isSuccessful){
+                saveFindIdData()
+//                moveMain(task.result?.user)
+                //아이디 생성 -> 메인화면 이동
             } else {
-
+                //이미 아이디가 있을 경우
+                signinEmail()
             }
         }
     }
-    fun moveMainPage(user:FirebaseUser?){
+    fun saveFindIdData(){
+        finish()
+       // startActivity(Intent(this, InputNumberActivity::class.java))
+    }
+    fun moveMain(user : FirebaseUser?){
         if(user != null){
-            startActivity(Intent(this,MainActivity::class.java))
+            if(user.isEmailVerified){
+                startActivity(Intent(this,MainActivity::class.java))
+                finish()
+            }else{
+                user.sendEmailVerification()
+            }
         }
     }
-
+    fun signinEmail(){
+        var id = binding.emailEdittext.text.toString()
+        var password = binding.passwordEdittext.text.toString()
+        auth.signInWithEmailAndPassword(id,password).addOnCompleteListener {
+                task ->
+            if(task.isSuccessful){
+                moveMain(task.result?.user)
+            }
+        }
+    }
+    var googleLoginResult = registerForActivityResult(ActivityResultContracts.StartActivityForResult()){
+            result ->
+        // 구글 로그인이 성공했을때 이메일 값이 넘어오는데 -> Token -> Email -> Firebase 서버
+        var data = result.data
+        var task = GoogleSignIn.getSignedInAccountFromIntent(data)
+        val account = task.getResult(ApiException::class.java)
+        firebaseAuthWithGoogle(account.idToken)
+    }
+    fun printHashKey(pContext: Context) {
+        try {
+            val info: PackageInfo = pContext.getPackageManager()
+                .getPackageInfo(pContext.getPackageName(), PackageManager.GET_SIGNATURES)
+            for (signature in info.signatures) {
+                val md: MessageDigest = MessageDigest.getInstance("SHA")
+                md.update(signature.toByteArray())
+                val hashKey: String = String(Base64.encode(md.digest(), 0))
+                Log.i(TAG, "printHashKey() Hash Key: $hashKey")
+            }
+        } catch (e: NoSuchAlgorithmException) {
+            Log.e(TAG, "printHashKey()", e)
+        } catch (e: Exception) {
+            Log.e(TAG, "printHashKey()", e)
+        }
+    }
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        callbackManager.onActivityResult(requestCode,resultCode,data)
+    }
 
 }
