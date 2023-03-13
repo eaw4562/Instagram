@@ -24,6 +24,7 @@ import com.bumptech.glide.request.RequestOptions
 import com.example.instagramclone.LoginActivity
 import com.example.instagramclone.MainActivity
 import com.example.instagramclone.R
+import com.example.instagramclone.navigation.model.AlarmDTO
 import com.example.instagramclone.navigation.model.ContentDTO
 import com.example.instagramclone.navigation.model.FollowDTO
 import com.google.android.material.bottomnavigation.BottomNavigationView
@@ -144,6 +145,7 @@ class UserFragment : Fragment() {
                 followDTO = FollowDTO()
                 followDTO!!.followerCount = 1
                 followDTO!!.followers[currentUserUid!!] = true
+                followerAlarm(uid!!)
 
                 transition.set(tsDocFollower, followDTO!!)
                 return@runTransaction
@@ -156,6 +158,7 @@ class UserFragment : Fragment() {
                 //내가 상대방 계정에 팔로우 하지 않앗을 경우
                 followDTO!!.followerCount = followDTO!!.followerCount + 1
                 followDTO!!.followers[currentUserUid!!] = true
+                followerAlarm(uid!!)
             }
             transition.set(tsDocFollower, followDTO!!)
             return@runTransaction
@@ -163,7 +166,15 @@ class UserFragment : Fragment() {
         }
 
     }
-
+    fun followerAlarm(destinationUid: String){
+        var alarmDTO = AlarmDTO()
+        alarmDTO.destinationUid = destinationUid
+        alarmDTO.userId = auth?.currentUser?.email
+        alarmDTO.uid = auth?.currentUser?.uid
+        alarmDTO.kind = 2
+        alarmDTO.timestamp = System.currentTimeMillis()
+        FirebaseFirestore.getInstance().collection("alarms").document().set(alarmDTO)
+    }
 
     private fun showMessage(activity: FragmentActivity?, message: String) {
         activity?.let {

@@ -80,6 +80,9 @@ class MainActivity : AppCompatActivity(),BottomNavigationView.OnNavigationItemSe
         }
 
 
+    fun registerPushToken(){
+        //FirebaseInstanceId.getInstance().instanceId.add
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

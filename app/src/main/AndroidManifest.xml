@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     package="com.example.instagramclone">
@@ -6,7 +7,8 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.CAMERA" />
 
-    <uses-feature android:name="android.hardware.camera.any"/>
+    <uses-feature android:name="android.hardware.camera.any" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -16,6 +18,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.InstagramClone"
         tools:targetApi="31">
+        <activity
+            android:name=".CommentActivity"
+            android:exported="false" />
         <activity
             android:name=".navigation.AddPhotoActivity"
             android:exported="false" />
@@ -30,7 +35,7 @@
         </activity>
         <activity
             android:name=".MainActivity"
-            android:exported="true"></activity>
+            android:exported="true" />
 
         <meta-data
             android:name="com.facebook.sdk.ApplicationId"
@@ -55,6 +60,12 @@
                 <data android:scheme="@string/fb_login_protocol_scheme" />
             </intent-filter>
         </activity>
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/push_icon"/>
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/colorAccent"/>
     </application>
 
 </manifest>
